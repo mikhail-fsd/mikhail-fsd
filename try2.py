@@ -5,6 +5,3 @@ print_hello("ghbdtn")
 
 
 
-
-
-
