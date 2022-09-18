@@ -7,26 +7,22 @@ class Category:
 
 
     def deposit(self, amount, discription=''):
-        dep = {'amount': amount, 'description':discription}
-        self.ledger.append(dep)
+        self.ledger.append({'amount': amount, 'description':discription})
+        self.balance += amount
 
     def withdraw(self, amount, discription=''):
-        if self.get_balance() > amount:
-            dep = {'amount': -amount, 'description':discription}
-            self.ledger.append(dep)
+        if self.balance > amount:
+            self.ledger.append({'amount': -amount, 'description':discription})
+            self.balance -= amount
             return True
         else:
             return False
 
     def get_balance(self):
-        balance = 0
-        for record in self.ledger:
-            balance += record['amount']
-        self.balance = balance
         return self.balance
 
     def transfer(self, transfer_amount, destionation_category):
-        if self.get_balance() > transfer_amount:
+        if self.balance > transfer_amount:
             transfer_description_withdraw= f'Transfer to {destionation_category.category}'
             self.withdraw(transfer_amount, transfer_description_withdraw)
 
@@ -36,7 +32,7 @@ class Category:
         return False
 
     def check_funds(self, amount):
-        if self.get_balance() >= amount:
+        if self.balance >= amount:
             return True
         else:
             return False
