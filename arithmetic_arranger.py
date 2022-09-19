@@ -1,13 +1,3 @@
-def space_len(i_problem,i):
-    maxlen = max(len(problem[i].split()[0]),len(problem[i].split()[2]))
-    space_len = 2 if len(i_problem) == maxlen else maxlen - len(i_problem) + 2
-    return space_len
-
-    #first_line = [' '*space_len(problem[i].split()[0],i) + problem[i].split()[0] + ' '*3 for i in range(len(problem))]
-    #second_line = [problem[i].split()[1] + ' '*(space_len(problem[i].split()[2],i)-1) + problem[i].split()[2] + ' '*3 for i in range(len(problem))]
-    #third_line = [(2 + max(len(problem[i].split()[0]),len(problem[i].split()[2]))) * '-' + ' '*3 for i in range(len(problem))]
-    #result_line = [int(problem[i].split()[0]) + int(problem[i].split()[2]) if problem[i].split()[1] == '+' else int(problem[i].split()[0]) - int(problem[i].split()[2]) for i in range(len(problem))]
- 
 def find_trubles(problems):
 
     trubles = {'too_many_problems' : False, 'incorrect_operators' : False, 'too_many_digits' : False, 'not_digit' : False}
@@ -39,39 +29,31 @@ def arithmetic_arranger(problems, result=False):
     
     for problem in problems:
         x1, operation, x2 = problem.split()
-        max_x_len = max(len(x1), len(x2))
-        full_line_len = max_x_len + 2
-        underline = '-'*full_line_len
-
-        if len(x1) == max_x_len:
-            space_1 = ' '*2
-            space_2 = ' '*(full_line_len - len(x2) - 1)
-        else:
-            space_1 = ' '*(full_line_len - len(x1))
-            space_2 = ' '
-            
-        first_line.append(f'{space_1}{x1}{intend}')
-        second_line.append(f'{operation}{space_2}{x2}{intend}')
-        third_line.append(f'{underline}{intend}')
+        line_len = max(len(x1), len(x2)) + 2
+        underline = '-'*line_len
+        
+        first_line.append(f"{x1:>{line_len}}")
+        second_line.append(f'{operation}{x2:>{line_len-1}}')
+        third_line.append(f'{underline}')
 
         if result:
             if operation == '+':
                 result_str = str(int(x1) + int(x2))
             else:
                 result_str = str(int(x1) - int(x2))
-            if len(result_str) > max_x_len:
-                result_line.append(f' {result_str}{intend}')
-            else:
-                result_line.append(f'{" "*(full_line_len - len(result_str))}{result_str}{intend}')
-        else:
-            result_line.append(' ')
-            
-    arithmetic_arranger = '\n'.join([''.join(first_line).rstrip(), ''.join(second_line).rstrip(), ''.join(third_line).rstrip(), ''.join(result_line)]).rstrip()
+            result_line.append(f'{result_str:>{line_len}}')
+
+    first_line = (intend).join(first_line)
+    second_line = (intend).join(second_line)
+    third_line = (intend).join(third_line)
+    result_line = (intend).join(result_line)
+    
+    arithmetic_arranger = '\n'.join([first_line, second_line, third_line, result_line]).rstrip()
     return arithmetic_arranger 
 
-problems = ['98 + 3g5', '3801 - 2', '45 + 43', '123 + 49']
+problems = ['98 + 35', '3801 - 2', '45 + 43', '123 + 49']
 
-print(arithmetic_arranger(problems, True))
+print(arithmetic_arranger(problems))
 
 #arguments = [['3801 - 2', '123 + 49']]
 #expected_output = '  3801      123\n-    2    +  49\n------    -----'

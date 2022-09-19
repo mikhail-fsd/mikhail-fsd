@@ -5,7 +5,15 @@ class Category:
         self.balance = 0
         self.category = category
 
+    def __str__(self):
+        bill = f'{self.category:*^30}\n'
+        for record in self.ledger:
+            bill += f"{record['description'][:23]:<24}{format(float(record['amount']), '.2f')}\n"
+        bill += f'Total: {self.balance}' 
+        
+        return bill 
 
+        
     def deposit(self, amount, discription=''):
         self.ledger.append({'amount': amount, 'description':discription})
         self.balance += amount
@@ -54,5 +62,7 @@ print()
 print(food.get_balance())
 print(food.ledger)
 
+print()
+print(food)
 #self.assertEqual(actual, expected, 'Expected balance to be 854.33')
 
