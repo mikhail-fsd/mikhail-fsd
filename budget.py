@@ -2,6 +2,7 @@ class Category:
 
     def __init__(self, category):
         self.ledger = list()
+        self.withdraw_amount = 0
         self.balance = 0
         self.category = category
 
@@ -22,6 +23,7 @@ class Category:
         if self.balance > amount:
             self.ledger.append({'amount': -amount, 'description':discription})
             self.balance -= amount
+            self.withdraw_amount += amount
             return True
         else:
             return False
@@ -48,21 +50,47 @@ class Category:
 
 
 def create_spend_chart(categories):
-        pass
+    total_spend = 0
+    chart = 'Percentage spent by category\n'
+    max_cat_len = 0
+
+    for c in categories:
+        total_spend += c.withdraw_amount
+        if len(c.category) > max_cat_len:
+            max_cat_len = len(c.category)
+
+    for i in range (10, -1, -1):
+        chart += f'{i*10:>3}|'
+        for c in categories:
+            if int(format(c.withdraw_amount / total_spend, '.2f')[2]) >= i:
+                chart += ' o '
+            else:
+                chart += '   ' 
+        chart += ' \n'
+    
+    chart += f"    {'-'*(len(categories)*3+1)}\n"
+    
+    for i in range(max_cat_len):
+        chart += '    ' 
+        for c in categories:
+            try:
+                chart += f' {c.category[i]} '
+            except:
+                chart += '   '
+        chart += ' \n' if i != max_cat_len - 1 else ' '
+    return chart
 
 
 food = Category('Food')
+entertainment = Category('Entertainment')
+business = Category('Business')
 food.deposit(900, "deposit")
-print(food.ledger)
-print()
-food.withdraw(45.67, "milk, cereal, eggs, bacon, bread")
-print(food.ledger)
-print()
+entertainment.deposit(900, "deposit")
+business.deposit(900, "deposit")
+food.withdraw(105.55)
+entertainment.withdraw(33.40)
+business.withdraw(10.99)
 
-print(food.get_balance())
-print(food.ledger)
 
-print()
-print(food)
-#self.assertEqual(actual, expected, 'Expected balance to be 854.33')
+print(create_spend_chart([business, food, entertainment]))
 
