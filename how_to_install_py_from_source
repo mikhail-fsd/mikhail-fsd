@@ -1,0 +1,13 @@
+1. download archive from python.org
+2. >> tar -xvf Python-x.x.x.tgz
+3. >> cd Python-x.x.x
+
+if problem with ssl
+a) first install openssl, please refer to this page: https://help.dreamhost.com/hc/en-us/articles/360001435926-Installing-OpenSSL-locally-under-your-username
+b) install python and ./configure --with-openssl=/home/[username]/openssl
+c) at last, run python3 -m ssl and nothing outputs, it's ok.
+
+
+4. >> ./configure prefix=/home/[username]/.pythonX.X --enable-optimizations --with-ensurepip=install --with-openssl=/home/[username]/openssl
+
+https://github.com/actions/setup-python/issues/93
