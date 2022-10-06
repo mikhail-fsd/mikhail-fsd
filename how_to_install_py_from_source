@@ -11,3 +11,4 @@ c) at last, run python3 -m ssl and nothing outputs, it's ok.
 4. >> ./configure prefix=/home/[username]/.pythonX.X --enable-optimizations --with-ensurepip=install --with-openssl=/home/[username]/openssl
 
 https://github.com/actions/setup-python/issues/93
+
