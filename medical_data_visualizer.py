@@ -5,8 +5,6 @@ import numpy as np
 
 
 
-
-
 # Import data
 df = pd.read_csv('medical_examination.csv')
 # Add 'overweight' column
@@ -15,71 +13,72 @@ df['overweight'] = [0 if x < 25 else 1 for x in (df['weight'] / (df['height']/10
 df['cholesterol'] = [0 if x == 1 else 1 for x in df['cholesterol']]
 df['gluc'] = [0 if x == 1 else 1 for x in df['gluc']]
 
-
-
-# sns.catplot([0, 1, 2, 3, 4, 5])
-# plt.show()
-
-df_melt_cardio = df.melt(id_vars=['cardio'], value_vars = ['active', 'alco', 'cholesterol', 'gluc', 'overweight', 'smoke'])
-#df_cardio_0 = df_melt_cardio[df_melt_cardio['cardio'] == 0].sort_values(by=['value', 'variable'])
-#df_cardio_1 = df_melt_cardio[df_melt_cardio['cardio'] == 1]
-#df_cat0 = df_cardio_0.groupby('variable')
-#df_df = df_cat0['value'].value_counts()
-#sns.countplot(data=df_cardio_0, x='variable', hue='value')
-#plt.show()
-print(df_melt_cardio)
-df_by_cardio = df_melt_cardio.groupby('cardio')
-sns.catplot(data=df_melt_cardio, x='variable', hue='value', col='cardio', kind='count').set(ylabel='total')
-
-plt.show()
-
-#print(df_by_cardio.get_group(0)['value'].value_counts())
-
-
-
 # Draw Categorical Plot
 def draw_cat_plot():
     # Create DataFrame for cat plot using `pd.melt` using just the values from 'cholesterol', 'gluc', 'smoke', 'alco', 'active', and 'overweight'.
-    df_cat1 = None
+    df_melt_cardio = df.melt(id_vars=['cardio'], value_vars = ['active', 'alco', 'cholesterol', 'gluc', 'overweight', 'smoke'])
 
 
     # Group and reformat the data to split it by 'cardio'. Show the counts of each feature. You will have to rename one of the columns for the catplot to work correctly.
-    df_cat = None
+    df_cardio_group = df_melt_cardio.groupby(['cardio', 'variable'])
+    df_cardio_group.value_counts()
     
 
     # Draw the catplot with 'sns.catplot()'
-
-
-
+    
     # Get the figure for the output
-    fig = None
-
-
+    #fig, ax = plt.subplots()
+    ax = sns.catplot(data=df_melt_cardio, x='variable', hue='value', col='cardio', kind='count').set(ylabel='total')
+    fig = ax.fig   
     # Do not modify the next two lines
+
     fig.savefig('catplot.png')
+    plt.show()
     return fig
+
 
 
 # Draw Heat Map
 def draw_heat_map():
+
+
+    # incorrect data filters
+    # diastolic pressure is higher than systolic 
+    filter1 = df['ap_lo'] <= df['ap_hi']
+    # height is less than the 2.5th percentile
+    filter2 = df['height'] >= df['height'].quantile(0.025)
+    # height is more than the 97.5th percentile
+    filter3 = df['height'] <= np.percentile(df['height'], 97.5) 
+    # weight is less than the 2.5th percentile
+    filter4 = df['weight'] >= np.percentile(df['weight'], 2.5) 
+    # weight is more than the 97.5th percentile
+    filter5 = df['weight'] <= np.percentile(df['weight'], 97.5) 
+
+
+
+
     # Clean the data
-    df_heat = None
+    df_heat = df[(filter1) & (filter2) & (filter3) & (filter4) & (filter5)]
 
     # Calculate the correlation matrix
-    corr = None
+    corr = df_heat.corr()
 
     # Generate a mask for the upper triangle
-    mask = None
-
+    mask = np.zeros_like(corr)
+    mask[np.triu_indices_from(mask)] = True
 
 
     # Set up the matplotlib figure
-    fig, ax = None
+    fig, ax = plt.subplots() 
 
     # Draw the heatmap with 'sns.heatmap()'
-
-
+    sns.heatmap(data=corr, mask=mask, annot=True, fmt='1.1f')
+    #plt.show()
 
     # Do not modify the next two lines
     fig.savefig('heatmap.png')
     return fig
+
+
+draw_cat_plot()
+#draw_heat_map()
