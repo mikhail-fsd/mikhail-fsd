@@ -23,24 +23,19 @@ def draw_cat_plot():
     df_cardio_group = df_melt_cardio.groupby(['cardio', 'variable'])
     df_cardio_group.value_counts()
     
-
     # Draw the catplot with 'sns.catplot()'
+    ax = sns.catplot(data=df_melt_cardio, x='variable', hue='value', col='cardio', kind='count').set(ylabel='total')
     
     # Get the figure for the output
-    #fig, ax = plt.subplots()
-    ax = sns.catplot(data=df_melt_cardio, x='variable', hue='value', col='cardio', kind='count').set(ylabel='total')
-    fig = ax.fig   
+    fig = ax.figure 
+
     # Do not modify the next two lines
-
     fig.savefig('catplot.png')
-    plt.show()
     return fig
-
 
 
 # Draw Heat Map
 def draw_heat_map():
-
 
     # incorrect data filters
     # diastolic pressure is higher than systolic 
@@ -54,9 +49,6 @@ def draw_heat_map():
     # weight is more than the 97.5th percentile
     filter5 = df['weight'] <= np.percentile(df['weight'], 97.5) 
 
-
-
-
     # Clean the data
     df_heat = df[(filter1) & (filter2) & (filter3) & (filter4) & (filter5)]
 
@@ -68,17 +60,16 @@ def draw_heat_map():
     mask[np.triu_indices_from(mask)] = True
 
 
+
     # Set up the matplotlib figure
-    fig, ax = plt.subplots() 
+    fig = plt.figure()
 
     # Draw the heatmap with 'sns.heatmap()'
     sns.heatmap(data=corr, mask=mask, annot=True, fmt='1.1f')
-    #plt.show()
-
     # Do not modify the next two lines
     fig.savefig('heatmap.png')
     return fig
 
 
 draw_cat_plot()
-#draw_heat_map()
+draw_heat_map()
