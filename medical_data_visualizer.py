@@ -25,10 +25,9 @@ def draw_cat_plot():
     
     # Draw the catplot with 'sns.catplot()'
     ax = sns.catplot(data=df_melt_cardio, x='variable', hue='value', col='cardio', kind='count').set(ylabel='total')
-    
     # Get the figure for the output
     fig = ax.figure 
-
+    
     # Do not modify the next two lines
     fig.savefig('catplot.png')
     return fig
