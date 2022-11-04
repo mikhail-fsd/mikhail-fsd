@@ -20,12 +20,17 @@ def update_data():
     #df = pd.concat([df_weight, df_lotsize_and_name, df_marketsdata], axis='columns', join='inner')
     df = df[['SHORTNAME', 'weight', 'tradedate', 'LOTSIZE']]
     df.columns = ['short_name', 'weight', 'weight_update', 'lot_size']
-    df['tradedate'] = df['tradedate'].dt.strftime('%d.%m.%Y')
+    df['weight_update'] = df['weight_update'].dt.strftime('%d.%m.%Y')
 
     con = sqlite3.connect('moex.db')
 
     df.to_sql('index_moex', con=con, if_exists='replace', index=True, index_label='ticker')
 
+def get_data_dframe():
+
+    con = sqlite3.connect('moex.db')
+    df = pd.read_sql('select * from index_moex', con=con, index_col='ticker')
+    return df
 
 def update_price():
 
@@ -37,9 +42,13 @@ def update_price():
 
     df.to_sql('price_moex', con=con, if_exists='replace', index=True, index_label='ticker')
 
-def get_price():
+def get_price_dframe():
     con = sqlite3.connect('moex.db')
     df = pd.read_sql('select * from price_moex', con=con, index_col='ticker')
+    df_lot_size = pd.read_sql('select ticker, lot_size from index_moex', con=con, index_col='ticker')
+    df = pd.concat([df, df_lot_size], axis='columns', join='inner')
+    df['lot_cost'] = df['last_price'] * df['lot_size']
+    df.drop(columns=['lot_size'], inplace=True)
     return df
    
 def user_init(user_id, name, goal=0, phone=None):
@@ -61,13 +70,15 @@ def user_init(user_id, name, goal=0, phone=None):
 
 
 
-def portfolio_init(start_budget): 
-
-    con = sqlite3.connect('moex.db')
-    df = pd.read_sql('select * from index_moex', con=con, index_col='ticker')
-    df = pd.concat([df, get_price()], axis='columns', join='inner') # ['short_name', 'weight', 'weight_update', 'lot_size', 'last_price', 'update_time'],
-
-    df['lot_cost'] = df['last_price'] * df['lot_size']
+def portfolio_init(start_budget, base_df=None): 
+    """ если на вход не подается базовая таблица, то за базу берется таблица из DB index_moex
+    
+    """
+    if base_df is None:
+        base_df = get_data_dframe()
+        df = pd.concat([base_df, get_price_dframe()], axis='columns', join='inner') # ['short_name', 'weight', 'weight_update', 'lot_size', 'last_price', 'update_time'],
+    else:
+        df = base_df
     
     df.sort_values(by='weight', ascending=False, inplace=True)
     df[['cash_to_spend', 'lots_to_buy']] = 0
@@ -81,6 +92,15 @@ def portfolio_init(start_budget):
     rest_of_money = start_budget - df['cash_to_spend'].sum()
     df = portfolio_refill(rest_of_money, df=df, table_type='goal_')
     return df
+
+
+def user_porfolio_init(user_id):
+    con = sqlite3.connect('moex.db')
+    df = pd.read_sql('select ticker from index_moex', con=con, index_col='ticker')
+    df[['my_shares', 'my_losts', 'total_shares_price']] = 0
+    table_name = f'portfolio_{user_id}'
+    df.to_sql(table_name, con=con, if_exists='replace', index=True, index_label='ticker')
+    print(df)
 
 def portfolio_refill(cash_refill, df, user_id='', table_type='actual_'):
    # con = sqlite3.connect('moex.db')
@@ -118,51 +138,54 @@ def portfolio_refill(cash_refill, df, user_id='', table_type='actual_'):
     
 def goals_portfolio_init():
      
-    df = portfolio_init(50_000)
-    for goal_budget in range(100_000, 1_100_000, 100_000):
+    df = None
+
+    lst = np.concatenate([np.arange(50_000, 250_000, 50_000), np.arange(300_000, 1_100_000, 100_000)])
+    for goal_budget in lst:
+        if df is None: df = portfolio_init(goal_budget) # когда таблица рассчитывается первый раз, то базовая таблица будет таблицей из DB index_moex 
         column_lot_name = f'goal_lots_amount_for_{goal_budget}'
         column_sum_name = f'goal_sum_for_{goal_budget}'
-        df_temp = portfolio_init(goal_budget) 
-        df[[column_lot_name, column_sum_name]] = df_temp[['lots_to_buy', 'cash_to_spend']]
+        column_weight_name = f'weight_when_buy_on_{goal_budget}'
+        df_temp = portfolio_init(goal_budget)# base_df=df) 
+        df[[column_lot_name, column_sum_name, column_weight_name]] = df_temp[['lots_to_buy', 'cash_to_spend', 'my_weight']]
+    columns_list = [x for x in df.columns if x.startswith('goal')]
+    print(columns_list)
+    df = df[columns_list]
 
-    return df
-    print('here')
-    print(df.info())
+    con = sqlite3.connect('moex.db')
+    df.to_sql('goal_portfolio', con=con, if_exists='replace', index=True, index_label='ticker')
 
 
+
+def get_offer_to_buy(user_id, cash_to_spend):
+    # для использования функции portfolio_refill() заменить cash_to_spend на total_shares_price 
+    pass
+
+
+
+#update_data()
 #update_price()
-file = ''
-df = goals_portfolio_init()
-df.to_csv(file, sep=';', encoding='cp1251', decimal=',')
+#file = ''
+#df = goals_portfolio_init()
+#df.to_csv(file, sep=';', encoding='cp1251', decimal=',')
 
 
 def test():
 
     con = sqlite3.connect('moex.db')
     cur = con.cursor()
-    res = cur.execute("select * from index_moex")
+    #res = cur.execute("select * from index_moex")
     #res = cur.execute("PRAGMA table_info('index_moex')")
+    res = cur.execute("select name from sqlite_master where type = 'table'")
     #print(res.fetchall())
+    print(res.fetchone())
     for row in res.fetchall():
         print(row)
+test()
 #portfolio_init(20_000)
 #portfolio_refill(1000, 11, table_type='goal_')
 exit()
 # нужна проверка на дату и сумму весов
 
 
-#csv_weight = 'https://iss.moex.com/iss/statistics/engines/stock/markets/index/analytics/IMOEX.csv?limit=100&iss.dp=comma&analytics.columns=tradedate,ticker,weight'
-#url = 'https://iss.moex.com/iss/statistics/engines/stock/markets/index/analytics/IMOEX.html?limit=100'
-#df_IMOEX = pd.read_html(url, encoding='utf-8')[0]
-#df_IMOEX.columns = [x.split()[0] for x in df_IMOEX.columns]
-#df_IMOEX['tradedate'] = pd.to_datetime(df_IMOEX['tradedate'])
-#df_IMOEX.to_csv('rer2.csv', encoding='cp1251', sep=';', date_format='%d.%m.%Y', decimal=',')
-
-#df_weight = pd.read_csv('csv_weight')
-#print(df_weight.describe())
-#print(df_for_calc)
-#print(df_for_calc['cash_to_spend3'].sum())
-#print(df[['weight', 'lotcost', 'LOTSIZE', 'cash_to_spend', 'shares_to_buy', 'lots_to_buy', 'cash_to_spend2']])
-#print(df['cash_to_spend'].sum())
-#print(df['cash_to_spend2'].sum())
 
