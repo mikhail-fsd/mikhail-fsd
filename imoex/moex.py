@@ -51,6 +51,14 @@ def get_price_dframe():
     df.drop(columns=['lot_size'], inplace=True)
     return df
    
+def get_user_pirtfolio_dframe(user_id):
+    con = sqlite3.connect('moex.db')
+    user_table = f'portfolio_{user_id}'
+    sql = f'select * from {user_table}'
+    df = pd.read_sql(sql=sql, con=con, index_col='ticker')
+    return df
+    
+
 def user_init(user_id, name, goal=0, phone=None):
     
     con = sqlite3.connect('moex.db')
@@ -70,7 +78,7 @@ def user_init(user_id, name, goal=0, phone=None):
 
 
 
-def portfolio_init(start_budget, base_df=None): 
+def portfolio_init(start_budget, base_df=None): # rough calc
     """ если на вход не подается базовая таблица, то за базу берется таблица из DB index_moex
     
     """
@@ -81,35 +89,51 @@ def portfolio_init(start_budget, base_df=None):
         df = base_df
     
     df.sort_values(by='weight', ascending=False, inplace=True)
-    df[['cash_to_spend', 'lots_to_buy']] = 0
+    df[['total_shares_price', 'lots_to_buy']] = 0
     for row in df.index:
         df.at[row, 'lots_to_buy'] = round(start_budget * (df.loc[row, 'weight']/100) / df.loc[row, 'lot_cost'])
-        df.at[row, 'cash_to_spend'] = df.loc[row, 'lots_to_buy'] * df.loc[row, 'lot_cost']
-        if df['cash_to_spend'].sum() > start_budget:
-            df.loc[row, ['lots_to_buy', 'cash_to_spend']] = 0
+        df.at[row, 'total_shares_price'] = df.loc[row, 'lots_to_buy'] * df.loc[row, 'lot_cost']
+        if df['total_shares_price'].sum() > start_budget:
+            df.loc[row, ['lots_to_buy', 'total_shares_price']] = 0
             break
     #df.to_sql(f'goal_portfolio', con=con, if_exists='replace', index=True, index_label='ticker')
-    rest_of_money = start_budget - df['cash_to_spend'].sum()
-    df = portfolio_refill(rest_of_money, df=df, table_type='goal_')
+    rest_of_money = start_budget - df['total_shares_price'].sum()
+    df = portfolio_refill(rest_of_money, df=df)
     return df
 
 
 def user_porfolio_init(user_id):
     con = sqlite3.connect('moex.db')
     df = pd.read_sql('select ticker from index_moex', con=con, index_col='ticker')
-    df[['my_shares', 'my_losts', 'total_shares_price']] = 0
+    df[['my_shares', 'my_lots', 'total_shares_price']] = 0
     table_name = f'portfolio_{user_id}'
     df.to_sql(table_name, con=con, if_exists='replace', index=True, index_label='ticker')
-    print(df)
 
-def portfolio_refill(cash_refill, df, user_id='', table_type='actual_'):
+def portfolio_refill(cash_refill, df, user_id=''):  # tight count
    # con = sqlite3.connect('moex.db')
    # if user_id: user_id = '_' + str(user_id)
    # user_table = f'{table_type}portfolio{user_id}'
    # sql = f"select * from {user_table}"
    # df = pd.read_sql(sql=sql, con=con, index_col='ticker')
     
-    df['my_weight'] = round((df['cash_to_spend'] / df['cash_to_spend'].sum()) * 100, 2)
+    try:
+        df['lot_cost']
+    except:
+        df_price = get_price_dframe()
+        df = pd.concat([df, df_price], axis='columns', join='inner')
+    try:
+        df['weight']
+    except:
+        df_data = get_data_dframe()
+        df = pd.concat([df, df_data['weight']], axis='columns', join='inner')
+
+    # prevent devision by 0
+    try:
+        df['lots_to_buy']
+    except:
+        df['lots_to_buy'] = 0
+
+    df['my_weight'] = round((df['total_shares_price'] / df['total_shares_price'].sum()) * 100, 2).fillna(0)
     df['diff_weight'] = (df['weight'] - df['my_weight'])
     df.sort_values(by='diff_weight', ascending=False, inplace=True)
     df[['session_cash_to_spend', 'session_lots_to_buy']] = 0
@@ -119,18 +143,18 @@ def portfolio_refill(cash_refill, df, user_id='', table_type='actual_'):
                 df.at[row, 'session_lots_to_buy'] += 1
                 df.at[row, 'session_cash_to_spend'] += df.loc[row, 'lot_cost']
  
-                df['my_weight'] = round(((df['cash_to_spend'] + df['session_cash_to_spend']) / (df['cash_to_spend'].sum() + df['session_cash_to_spend'].sum())) * 100, 2)
+                df['my_weight'] = round(((df['total_shares_price'] + df['session_cash_to_spend']) / (df['total_shares_price'].sum() + df['session_cash_to_spend'].sum())) * 100, 2)
                 df['diff_weight'] = (df['weight'] - df['my_weight'])
                 df.sort_values(by='diff_weight', ascending=False, inplace=True)
                 break 
  
-    #print(df['cash_to_spend'].sum(), df['session_cash_to_spend'].sum())
-    df['cash_to_spend'] += df['session_cash_to_spend']
+    #print(df['total_shares_price'].sum(), df['session_cash_to_spend'].sum())
+    df['total_shares_price'] += df['session_cash_to_spend']
     df['lots_to_buy'] += df['session_lots_to_buy']
 
 
-    #print(df[['short_name', 'weight', 'lot_cost', 'lots_to_buy', 'cash_to_spend', 'my_weight', 'diff_weight']])
-    #print(df['cash_to_spend'].sum())
+    #print(df[['short_name', 'weight', 'lot_cost', 'lots_to_buy', 'total_shares_price', 'my_weight', 'diff_weight']])
+    #print(df['total_shares_price'].sum())
 
     return df
 
@@ -147,45 +171,49 @@ def goals_portfolio_init():
         column_sum_name = f'goal_sum_for_{goal_budget}'
         column_weight_name = f'weight_when_buy_on_{goal_budget}'
         df_temp = portfolio_init(goal_budget)# base_df=df) 
-        df[[column_lot_name, column_sum_name, column_weight_name]] = df_temp[['lots_to_buy', 'cash_to_spend', 'my_weight']]
+        df[[column_lot_name, column_sum_name, column_weight_name]] = df_temp[['lots_to_buy', 'total_shares_price', 'my_weight']]
     columns_list = [x for x in df.columns if x.startswith('goal')]
-    print(columns_list)
     df = df[columns_list]
-
     con = sqlite3.connect('moex.db')
     df.to_sql('goal_portfolio', con=con, if_exists='replace', index=True, index_label='ticker')
 
 
 
-def get_offer_to_buy(user_id, cash_to_spend):
+def get_buy_offer(user_id, cash_to_spend):
     # для использования функции portfolio_refill() заменить cash_to_spend на total_shares_price 
-    pass
+    df_user_portfolio = get_user_pirtfolio_dframe(user_id)
+    df_offer = portfolio_refill(cash_to_spend, df=df_user_portfolio)
+    return df_offer
 
-
-
+#user_porfolio_init(3233)
+#print(get_buy_offer(3233, 10_000)['diff_weight'])
+budget = 5_000
+df1 = portfolio_init(budget)[['lots_to_buy', 'total_shares_price']]
+df2 = get_buy_offer(3233, budget)[['session_lots_to_buy', 'session_cash_to_spend']] 
+df3 = pd.concat([df1, df2], axis='columns', join='inner')
+file ='/mnt/c/Users/Mikhail/OneDrive/backup/res.csv' 
 #update_data()
 #update_price()
 #file = ''
-#df = goals_portfolio_init()
-#df.to_csv(file, sep=';', encoding='cp1251', decimal=',')
+#goals_portfolio_init()
+df3.to_csv(file, sep=';', encoding='cp1251', decimal=',')
 
 
 def test():
 
     con = sqlite3.connect('moex.db')
     cur = con.cursor()
+    res = cur.execute('select * from portfolio_3233')
     #res = cur.execute("select * from index_moex")
     #res = cur.execute("PRAGMA table_info('index_moex')")
-    res = cur.execute("select name from sqlite_master where type = 'table'")
+    #res = cur.execute("select name from sqlite_master where type = 'table'")
     #print(res.fetchall())
     print(res.fetchone())
     for row in res.fetchall():
         print(row)
-test()
+#test()
 #portfolio_init(20_000)
 #portfolio_refill(1000, 11, table_type='goal_')
-exit()
-# нужна проверка на дату и сумму весов
 
 
 
