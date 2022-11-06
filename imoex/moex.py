@@ -59,7 +59,7 @@ def get_user_pirtfolio_dframe(user_id):
     return df
     
 
-def user_init(user_id, name, goal=0, phone=None):
+def user_init(user_id, name, goal=0, phone=''):
     
     con = sqlite3.connect('moex.db')
     cur = con.cursor()
@@ -105,7 +105,7 @@ def portfolio_init(start_budget, base_df=None): # rough calc
 def user_porfolio_init(user_id):
     con = sqlite3.connect('moex.db')
     df = pd.read_sql('select ticker from index_moex', con=con, index_col='ticker')
-    df[['my_shares', 'my_lots', 'total_shares_price']] = 0
+    df[['my_shares', 'my_lots']] = 0
     table_name = f'portfolio_{user_id}'
     df.to_sql(table_name, con=con, if_exists='replace', index=True, index_label='ticker')
 
@@ -115,23 +115,13 @@ def portfolio_refill(cash_refill, df, user_id=''):  # tight count
    # user_table = f'{table_type}portfolio{user_id}'
    # sql = f"select * from {user_table}"
    # df = pd.read_sql(sql=sql, con=con, index_col='ticker')
-    
-    try:
-        df['lot_cost']
-    except:
+    if user_id:
         df_price = get_price_dframe()
-        df = pd.concat([df, df_price], axis='columns', join='inner')
-    try:
-        df['weight']
-    except:
         df_data = get_data_dframe()
-        df = pd.concat([df, df_data['weight']], axis='columns', join='inner')
+        df = pd.concat([df, df_price, df_data['weight']], axis='columns', join='inner')
+        df['total_shares_price'] = df['my_lots'] * df['lot_cost']
 
-    # prevent devision by 0
-    try:
-        df['lots_to_buy']
-    except:
-        df['lots_to_buy'] = 0
+        df['lots_to_buy'] = 0  # для юзеров не используется, используется при расчете goals_portfolio
 
     df['my_weight'] = round((df['total_shares_price'] / df['total_shares_price'].sum()) * 100, 2).fillna(0)
     df['diff_weight'] = (df['weight'] - df['my_weight'])
@@ -180,40 +170,68 @@ def goals_portfolio_init():
 
 
 def get_buy_offer(user_id, cash_to_spend):
-    # для использования функции portfolio_refill() заменить cash_to_spend на total_shares_price 
     df_user_portfolio = get_user_pirtfolio_dframe(user_id)
-    df_offer = portfolio_refill(cash_to_spend, df=df_user_portfolio)
+    df_offer = portfolio_refill(cash_to_spend, user_id=user_id, df=df_user_portfolio)
     return df_offer
+
+
+def buy_securities(user_id, ticker_name, value, lot_or_share):
+
+    ticker_name = f'\'{ticker_name}\''
+    
+    con = sqlite3.connect('moex.db')
+    cur = con.cursor()
+
+    lot_size = cur.execute(f"SELECT lot_size FROM index_moex WHERE ticker = {ticker_name}").fetchone()[0]
+
+    if lot_or_share == 'share':
+        shares = value
+        lots = value / lot_size
+    elif lot_or_share == 'lot':
+        shares = value * lot_size
+        lots = value
+
+    user_table = f'portfolio_{user_id}'
+    cur.execute(f"UPDATE {user_table} SET my_shares = my_shares + {shares}, my_lots = my_lots + {lots} WHERE ticker = {ticker_name}")
+    con.commit()
+
+def securities_sell():
+    pass
+
 
 #user_porfolio_init(3233)
 #print(get_buy_offer(3233, 10_000)['diff_weight'])
-budget = 5_000
-df1 = portfolio_init(budget)[['lots_to_buy', 'total_shares_price']]
-df2 = get_buy_offer(3233, budget)[['session_lots_to_buy', 'session_cash_to_spend']] 
-df3 = pd.concat([df1, df2], axis='columns', join='inner')
-file ='/mnt/c/Users/Mikhail/OneDrive/backup/res.csv' 
+#budget = 40_000
+#df1 = portfolio_init(budget)[['lots_to_buy', 'total_shares_price']]
+#df2 = get_buy_offer(3233, budget)[['session_lots_to_buy', 'session_cash_to_spend']] 
+#df3 = pd.concat([df1, df2], axis='columns', join='inner')
+#file ='/mnt/c/Users/Mikhail/OneDrive/backup/res.csv' 
 #update_data()
 #update_price()
 #file = ''
 #goals_portfolio_init()
-df3.to_csv(file, sep=';', encoding='cp1251', decimal=',')
+#df3.to_csv(file, sep=';', encoding='cp1251', decimal=',')
 
 
 def test():
 
     con = sqlite3.connect('moex.db')
     cur = con.cursor()
+    #cur.execute('update portfolio_3233 set my_shares = 0, my_lots = 0 where ticker = "AFLT"') 
     res = cur.execute('select * from portfolio_3233')
     #res = cur.execute("select * from index_moex")
     #res = cur.execute("PRAGMA table_info('index_moex')")
     #res = cur.execute("select name from sqlite_master where type = 'table'")
     #print(res.fetchall())
+    con.commit()
     print(res.fetchone())
     for row in res.fetchall():
         print(row)
-#test()
-#portfolio_init(20_000)
-#portfolio_refill(1000, 11, table_type='goal_')
+buy_securities(3233, 'GAZP', 1, 'lot')
+#user_porfolio_init(3233)
+df2 = get_buy_offer(3233, 10_000)[['session_lots_to_buy', 'session_cash_to_spend']] 
+print(df2)
+test()
 
 
 
